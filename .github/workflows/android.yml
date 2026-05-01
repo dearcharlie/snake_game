@@ -42,7 +42,7 @@ jobs:
           workspaces: src-tauri
 
       - name: Build Android APK
-        run: npm run tauri build --target aarch64-linux-android
+        run: npm run tauri build
         env:
           ANDROID_HOME: /opt/android-sdk
           ANDROID_SDK_ROOT: /opt/android-sdk
@@ -51,5 +51,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: src-tauri/target/aarch64-linux-android/release/bundle/apk/*.apk
+          path: src-tauri/target/*/release/bundle/apk/*.apk
           retention-days: 5
