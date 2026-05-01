@@ -7,7 +7,6 @@ edition = "2021"
 
 [lib]
 name = "snake_game_lib"
-crate-type = ["cdylib"]
 path = "lib.rs"
 
 [[bin]]

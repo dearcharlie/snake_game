@@ -1,7 +1,6 @@
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
-use tauri::State;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Position {
@@ -149,7 +148,6 @@ impl GameManager {
             y: head.y + dy,
         };
 
-        // Wall collision
         if new_head.x <= 0
             || new_head.x >= state.grid_width - 1
             || new_head.y <= 0
@@ -162,7 +160,6 @@ impl GameManager {
             return state.clone();
         }
 
-        // Self collision
         if state.snake.iter().any(|s| s.x == new_head.x && s.y == new_head.y) {
             state.game_over = true;
             if state.score > state.high_score {
@@ -171,10 +168,8 @@ impl GameManager {
             return state.clone();
         }
 
-        // Check if eating food (before moving)
         let eating = new_head.x == state.food.x && new_head.y == state.food.y;
 
-        // Build new snake
         let mut new_snake = vec![new_head.clone()];
         new_snake.extend_from_slice(&state.snake[..]);
 
@@ -196,40 +191,4 @@ impl GameManager {
     pub fn restart(&self) {
         self.do_reset();
     }
-}
-
-// === Tauri Commands ===
-
-#[tauri::command]
-pub fn start_game(manager: State<'_, GameManager>) -> GameState {
-    manager.restart();
-    manager.get_state()
-}
-
-#[tauri::command]
-pub fn get_game_state(manager: State<'_, GameManager>) -> GameState {
-    manager.get_state()
-}
-
-#[tauri::command]
-pub fn set_direction(manager: State<'_, GameManager>, direction: String) {
-    let dir = match direction.as_str() {
-        "up" => Direction::Up,
-        "down" => Direction::Down,
-        "left" => Direction::Left,
-        "right" => Direction::Right,
-        _ => return,
-    };
-    manager.set_direction(dir);
-}
-
-#[tauri::command]
-pub fn tick_game(manager: State<'_, GameManager>) -> GameState {
-    manager.tick()
-}
-
-#[tauri::command]
-pub fn restart_game(manager: State<'_, GameManager>) -> GameState {
-    manager.restart();
-    manager.get_state()
 }
