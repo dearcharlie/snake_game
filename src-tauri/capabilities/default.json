@@ -1,0 +1,10 @@
+{
+  "$schema": "https://v2.tauri.app/schemas/capability.schema.json",
+  "identifier": "default",
+  "description": "Default permissions for the Snake Game",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "shell:allow-open"
+  ]
+}

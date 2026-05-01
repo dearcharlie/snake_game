@@ -36,6 +36,11 @@ jobs:
       - name: Install Android SDK
         uses: android-actions/setup-android@v2
 
+      - name: Accept Android licenses
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+          yes | $ANDROID_HOME/platform-tools/bin ./adb --version || true
+
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
         with:
