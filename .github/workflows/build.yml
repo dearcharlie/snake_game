@@ -56,9 +56,7 @@ jobs:
           workspaces: src-tauri
 
       - name: Build Tauri
-        run: |
-          npm run build
-          cargo tauri build ${{ matrix.args }}
+        run: npm run tauri build -- ${{ matrix.args }}
 
       - name: Upload Windows installer
         if: matrix.platform == 'windows-latest'
