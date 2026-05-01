@@ -37,20 +37,24 @@ jobs:
 
       - name: Build on Windows
         if: matrix.os == 'windows-latest'
-        run: pyinstaller --name snake_game --onefile --windowed snake.py
         shell: bash
+        run: |
+          pip install pygame
+          pyinstaller --name snake_game --onefile --windowed snake.py
 
       - name: Build on macOS
         if: matrix.os == 'macos-latest'
         run: |
-          pip install pyinstaller
+          pip install pygame
           pyinstaller --name snake_game --onefile --windowed snake.py || \
           pyinstaller --name snake_game --onefile snake.py
 
       - name: Build on Linux
         if: matrix.os == 'ubuntu-latest'
         run: |
-          sudo apt-get install -y xvfb libnotify4 libnss3 libxss1 libasound2
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libnotify4 libnss3 libxss1 libasound2 libgtk-3-0
+          pip install pygame
           pyinstaller --name snake_game --onefile snake.py
 
       - name: Upload artifact
