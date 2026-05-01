@@ -1,0 +1,81 @@
+name: Build Android APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install pygame cython
+          pip install buildozer
+
+      - name: Prepare Android SDK
+        run: |
+          mkdir -p ~/.local/android-sdk
+          cd ~/.local/android-sdk
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip -O cmdline-tools.zip
+          unzip -q cmdline-tools.zip
+          mkdir -p cmdline-tools/latest
+          mv cmdline-tools/* cmdline-tools/latest/ 2>/dev/null || true
+          export ANDROID_HOME=~/.local/android-sdk
+          export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0" > /dev/null 2>&1
+
+      - name: Create buildozer.spec
+        run: |
+          cat > buildozer.spec << 'EOF'
+          [app]
+
+          title = Snake Game
+          package.name = snakegame
+          package.domain = org.snakegame
+          source.dir = .
+          source.include_exts = py,png,jpg,kv,atlas
+          version = 1.0.0
+
+          requirements = pygame
+          orientation = landscape
+
+          osx.python_version = 3
+          osx.kivy_version = any
+
+          fullscreen = 1
+
+          android.permissions = INTERNET
+          android.archs = arm64-v8a, armeabi-v7a
+          android.api = 34
+          android.minapi = 21
+
+          [buildozer]
+          log_level = 1
+          EOF
+
+      - name: Build Android APK
+        env:
+          ANDROID_HOME: ~/.local/android-sdk
+          PATH: $PATH:~/.local/android-sdk/cmdline-tools/latest/bin:~/.local/android-sdk/platform-tools
+        run: |
+          buildozer android debug || buildozer android release
+          ls -la *.apk 2>/dev/null || find . -name "*.apk" 2>/dev/null
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: snake-game-android
+          path: '*.apk'
+          retention-days: 30
