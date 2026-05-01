@@ -1,5 +1,4 @@
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 
 // === Types (mirror of Rust) ===
 interface Position {
@@ -52,7 +51,7 @@ canvas.height = CANVAS_H;
 let gameState: GameState | null = null;
 let started = false;
 let paused = false;
-let animationId: number | null = null;
+let _animationId: number | null = null;
 let lastTick = 0;
 let tickInterval = 100; // ms
 
@@ -194,7 +193,7 @@ async function tick() {
 
 function gameLoop(timestamp: number) {
   if (!started || paused) {
-    animationId = requestAnimationFrame(gameLoop);
+    _animationId = requestAnimationFrame(gameLoop);
     return;
   }
 
@@ -203,7 +202,7 @@ function gameLoop(timestamp: number) {
     tick();
   }
 
-  animationId = requestAnimationFrame(gameLoop);
+  _animationId = requestAnimationFrame(gameLoop);
 }
 
 // === Controls ===
@@ -294,7 +293,7 @@ async function init() {
   window.addEventListener("keydown", handleKey);
 
   // Start render loop
-  animationId = requestAnimationFrame(gameLoop);
+  _animationId = requestAnimationFrame(gameLoop);
 }
 
 init();
