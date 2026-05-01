@@ -43,8 +43,6 @@
       }
     },
     "android": {
-      "active": true,
-      "targets": ["apk", "aab"],
       "minSdkVersion": 24
     }
   }
