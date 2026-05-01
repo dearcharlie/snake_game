@@ -1,8 +1,25 @@
-__pycache__/
-*.pyc
-*.pyo
-*.egg-info/
+# Tauri
+/src-tauri/target
+/src-tauri/gen
+/src-tauri/src-tauri
+
+# Node
+node_modules/
 dist/
-build/
-*.spec
-snake_highscore.txt
+dist*/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# Env
+.env
+.env.*
+target

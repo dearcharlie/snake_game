@@ -1,0 +1,36 @@
+[package]
+name = "snake-game"
+version = "2.0.0"
+description = "Snake Game built with Rust + Tauri 2"
+authors = ["dearcharlie"]
+edition = "2021"
+
+[lib]
+name = "snake_game_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+path = "lib.rs"
+
+[[bin]]
+name = "snake-game"
+path = "main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["devtools"] }
+tauri-plugin-shell = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rand = "0.8"
+log = "0.4"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-opener = "2"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

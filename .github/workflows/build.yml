@@ -6,72 +6,120 @@ on:
       - 'v*'
   workflow_dispatch:
 
+env:
+  CARGO_INCREMENTAL: 0
+
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: windows-latest
-            artifact: snake_game.exe
-            path: dist/snake_game.exe
-          - os: macos-latest
-            artifact: snake_game
-            path: dist/snake_game
-          - os: ubuntu-latest
-            artifact: snake_game
-            path: dist/snake_game
-
+  build-windows:
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          python-version: '3.10'
-
-      - name: Install PyInstaller
-        run: pip install pyinstaller
-
-      - name: Build on Windows
-        if: matrix.os == 'windows-latest'
-        run: pyinstaller --name snake_game --onefile --console snake_console.py
-
-      - name: Build on macOS
-        if: matrix.os == 'macos-latest'
-        run: pyinstaller --name snake_game --onefile --console snake_console.py
-
-      - name: Build on Linux
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          pyinstaller --name snake_game --onefile --console snake_console.py
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+          node-version: '20'
+      - name: Install frontend deps
+        run: npm ci
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
         with:
-          name: ${{ matrix.artifact }}-${{ matrix.os }}
-          path: ${{ matrix.path }}
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: List artifacts
-        run: find artifacts -type f -name "*snake*" | head -20
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: artifacts/**/*
-          draft: true
+          workspaces: src-tauri
+      - name: Build Tauri
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Snake Game v__VERSION__'
+          releaseBody: 'Cross-platform Snake game built with Rust + Tauri + TypeScript'
+          releaseDraft: true
+          prerelease: false
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install frontend deps
+        run: npm ci
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Build Tauri
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Snake Game v__VERSION__'
+          releaseBody: 'Cross-platform Snake game built with Rust + Tauri + TypeScript'
+          releaseDraft: true
+          prerelease: false
+
+  build-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install frontend deps
+        run: npm ci
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install Linux deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Build Tauri
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Snake Game v__VERSION__'
+          releaseBody: 'Cross-platform Snake game built with Rust + Tauri + TypeScript'
+          releaseDraft: true
+          prerelease: false
+
+  build-android:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install frontend deps
+        run: npm ci
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install Android SDK
+        uses: android-actions/setup-android@v2
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - name: Build Tauri
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Snake Game v__VERSION__'
+          releaseBody: 'Cross-platform Snake game built with Rust + Tauri + TypeScript'
+          releaseDraft: true
+          prerelease: false
