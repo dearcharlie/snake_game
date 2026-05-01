@@ -51,11 +51,10 @@ jobs:
           workspaces: src-tauri
 
       - name: Build Android APK
-        run: npm run tauri build 2>&1
+        run: npm run tauri build -- --target aarch64-linux-android
         env:
           ANDROID_HOME: /opt/android-sdk
           ANDROID_SDK_ROOT: /opt/android-sdk
-          DEBUG: 1
 
       - name: Find APK files
         run: |
