@@ -42,8 +42,7 @@ fn restart_game(state: tauri::State<'_, AppState>) -> GameState {
 fn main() {
     log::info!("Starting Snake Game...");
 
-    tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .manage(AppState(Mutex::new(GameManager::new())))
         .invoke_handler(tauri::generate_handler![
@@ -52,7 +51,12 @@ fn main() {
             set_direction,
             tick_game,
             restart_game,
-        ])
+        ]);
+
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    let builder = builder.plugin(tauri_plugin_opener::init());
+
+    builder
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
