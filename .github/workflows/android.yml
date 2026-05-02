@@ -53,13 +53,20 @@ jobs:
       - name: Build Android APK
         continue-on-error: true
         run: |
-          ANDROID_NDK_ROOT="$ANDROID_HOME/ndk/$(ls $ANDROID_HOME/ndk/ 2>/dev/null | head -1)"
+          set -x
+          NDK_VERSION=$(ls $ANDROID_HOME/ndk/ 2>/dev/null | head -1)
+          ANDROID_NDK_ROOT="$ANDROID_HOME/ndk/$NDK_VERSION"
+          echo "NDK_VERSION=$NDK_VERSION"
           echo "NDK root: $ANDROID_NDK_ROOT"
-          CLANG=$(find "$ANDROID_NDK_ROOT" -name "*aarch64-linux-android*clang*" 2>/dev/null | grep -v lib | head -1)
+          TOOLCHAIN="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          echo "Toolchain dir: $TOOLCHAIN"
+          ls "$TOOLCHAIN"/aarch64-linux-android*-clang* 2>/dev/null || echo "No clang found in toolchain"
+          CLANG="$TOOLCHAIN/aarch64-linux-android33-clang"
           echo "Clang: $CLANG"
           export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$CLANG"
           export CC="$CLANG"
           export CXX="${CLANG%clang}clang++"
+          echo "LINKER=$CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER"
           npx tauri build --target aarch64-linux-android 2>&1 | tee /tmp/build.log
           echo "BUILD_EXIT=${PIPESTATUS[0]}" >> /tmp/build.env
         env:
