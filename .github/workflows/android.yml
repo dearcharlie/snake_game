@@ -42,6 +42,11 @@ jobs:
         with:
           targets: aarch64-linux-android
 
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
       - name: Build frontend
         run: npm run build
 
@@ -52,7 +57,7 @@ jobs:
           export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$CLANG"
           export CC="$CLANG"
           export CXX="${CLANG%clang}clang++"
-          npx tauri build --target aarch64-linux-android 2>&1
+          npx tauri build --target aarch64-linux-android
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
@@ -69,10 +74,9 @@ jobs:
             echo "apk_found=false" >> $GITHUB_OUTPUT
           else
             echo "apk_found=true" >> $GITHUB_OUTPUT
-            echo "apk_paths=$APKS" >> $GITHUB_OUTPUT
           fi
           echo "=== Target directory contents ==="
-          ls -la src-tauri/target/aarch64-linux-android/release/ 2>/dev/null | head -20
+          ls src-tauri/target/aarch64-linux-android/release/ 2>/dev/null | head -20
 
       - name: Upload APK
         if: steps.find-apk.outputs.apk_found == 'true'
