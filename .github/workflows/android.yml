@@ -55,9 +55,7 @@ jobs:
           JAVA_HOME: ${{ env.JAVA_HOME }}
 
       - name: Build Android APK
-        run: |
-          cd src-tauri
-          npx tauri build --target aarch64-linux-android
+        run: npx tauri build
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
