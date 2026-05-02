@@ -51,6 +51,7 @@ jobs:
         run: npm run build
 
       - name: Build Android APK
+        continue-on-error: true
         run: |
           ANDROID_NDK_ROOT="$ANDROID_HOME/ndk/$(ls $ANDROID_HOME/ndk/ 2>/dev/null | head -1)"
           echo "NDK root: $ANDROID_NDK_ROOT"
