@@ -52,30 +52,40 @@ jobs:
 
       - name: Build Android APK
         run: |
-          set -x
           ANDROID_NDK_ROOT="$ANDROID_HOME/ndk/$(ls $ANDROID_HOME/ndk/ 2>/dev/null | head -1)"
           echo "NDK root: $ANDROID_NDK_ROOT"
           CLANG=$(find "$ANDROID_NDK_ROOT" -name "*aarch64-linux-android*clang*" 2>/dev/null | grep -v lib | head -1)
-          echo "Found clang: $CLANG"
+          echo "Clang: $CLANG"
           export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$CLANG"
           export CC="$CLANG"
           export CXX="${CLANG%clang}clang++"
-          npx tauri build --target aarch64-linux-android
+          npx tauri build --target aarch64-linux-android 2>&1 | tee /tmp/build.log
+          echo "BUILD_EXIT=${PIPESTATUS[0]}" >> /tmp/build.env
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
           NDK_HOME: ${{ env.NDK_HOME }}
+
+      - name: Check build result
+        run: |
+          echo "Exit code: $(cat /tmp/build.env 2>/dev/null)"
+          echo "=== Last 50 lines of build log ==="
+          tail -50 /tmp/build.log 2>/dev/null || echo "No log"
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: /tmp/build.log
+          retention-days: 1
 
       - name: Find APK files
         id: find-apk
         run: |
           APKS=$(find src-tauri/target -name "*.apk" -type f 2>/dev/null)
           echo "APKs found: $APKS"
-          if [ -z "$APKS" ]; then
-            echo "apk_found=false" >> $GITHUB_OUTPUT
-          else
-            echo "apk_found=true" >> $GITHUB_OUTPUT
-          fi
+          echo "apk_found=$(if [ -z "$APKS" ]; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
           ls src-tauri/target/aarch64-linux-android/release/ 2>/dev/null | head -10
 
       - name: Upload APK
