@@ -50,6 +50,9 @@ jobs:
       - name: Build frontend
         run: npm run build
 
+      - name: Install cargo-apk
+        run: cargo install cargo-apk
+
       - name: Build Android APK
         continue-on-error: true
         run: |
