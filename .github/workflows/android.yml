@@ -23,170 +23,23 @@ jobs:
       - name: Install frontend deps
         run: npm ci
 
+      - name: Build frontend
+        run: npm run build
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v2
-        with:
-          ndk-version: r26b
-
-      - name: Accept licenses
-        run: yes | sdkmanager --licenses 2>/dev/null || true
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android
-
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-
-      - name: Build frontend
-        run: npm run build
-
       - name: Build Android APK
-        timeout-minutes: 35
-        continue-on-error: true
-        run: |
-          set -x
-          pwd
-          ls -la
-          NDK_VERSION=$(ls $ANDROID_HOME/ndk/ 2>/dev/null | head -1)
-          ANDROID_NDK_ROOT="$ANDROID_HOME/ndk/$NDK_VERSION"
-          TOOLCHAIN="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          CLANG="$TOOLCHAIN/aarch64-linux-android33-clang"
-          CXX="${CLANG%clang}clang++"
-          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$CLANG"
-          export CC="$CLANG"
-          export CXX="$CXX"
-          export ANDROID_NDK_ROOT="$ANDROID_NDK_ROOT"
-          export PATH="$TOOLCHAIN:$PATH"
-          echo "NDK=$ANDROID_NDK_ROOT"
-          echo "CLANG=$CLANG"
-          echo "=== Checking tauri CLI ==="
-          npx tauri android --version 2>&1 || echo "tauri android not available"
-          cd src-tauri
-          pwd
-          echo "=== gen/android before init ==="
-          ls -la gen/ 2>/dev/null || echo "gen/ does not exist"
-          rm -rf gen/android
-          echo "=== After rm, gen/ ==="
-          ls -la gen/ 2>/dev/null || echo "gen/ does not exist"
-          echo "=== Running android init ==="
-          npx tauri android init --ci 2>&1 | head -30
-          echo "=== gen/android after init ==="
-          ls -la gen/ 2>/dev/null || echo "gen/ does not exist"
-          ls -la gen/android/ 2>/dev/null || echo "gen/android does not exist"
-          echo "=== build.gradle content ==="
-          cat gen/android/app/build.gradle 2>/dev/null | head -50
-          echo "=== Running actual tauri android build ==="
-          npx tauri android build --release 2>&1 | tee /tmp/build.log
-          echo "BUILD_EXIT=${PIPESTATUS[0]}" >> /tmp/build.env
-
-      - name: Check build result
-        run: |
-          echo "Exit code: $(cat /tmp/build.env 2>/dev/null)"
-          tail -60 /tmp/build.log 2>/dev/null || echo "No log"
-
-      - name: Upload build log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: /tmp/build.log
-          retention-days: 1
-
-      - name: Find APK files
-        id: find-apk
-        run: |
-          echo "=== gen/android directory ==="
-          find src-tauri/gen/android -type f 2>/dev/null | head -20
-          echo "=== Looking for APKs ==="
-          APKS=$(find src-tauri/gen/android -name "*.apk" -type f 2>/dev/null)
-          echo "APKs found: $APKS"
-          FOUND="false"
-          if [ -n "$APKS" ]; then FOUND="true"; fi
-          echo "apk_found=$FOUND" >> $GITHUB_OUTPUT
-          echo "=== APK sizes ==="
-          for a in $APKS; do echo "$a: $(du -h $a 2>/dev/null | cut -f1)"; done
-
-      - name: Inject frontend dist into APK
-        if: steps.find-apk.outputs.apk_found == 'true'
-        run: |
-          python3 << 'EOF'
-          import zipfile, os, shutil, tempfile
-
-          # Find APK
-          apks = []
-          for root, dirs, files in os.walk('src-tauri/gen/android'):
-              for f in files:
-                  if f.endswith('.apk'):
-                      apks.append(os.path.join(root, f))
-
-          # Find dist files
-          dist_dir = '../dist'
-          if not os.path.exists(dist_dir):
-              print('dist dir not found')
-              exit(0)
-
-          for apk in apks:
-              print(f'Injecting dist into {apk}')
-              tmp = tempfile.mktemp(suffix='.apk')
-              with zipfile.ZipFile(apk, 'r') as src:
-                  with zipfile.ZipFile(tmp, 'w', zipfile.ZIP_DEFLATED) as dst:
-                      for item in src.infolist():
-                          data = src.read(item.filename)
-                          # Skip old assets (but keep META-INF and other needed files)
-                          if not item.filename.startswith('assets/') or item.filename == 'assets/tauri.conf.json':
-                              dst.writestr(item, data)
-                      # Add dist files
-                      for root, dirs, files in os.walk(dist_dir):
-                          for f in files:
-                              full_path = os.path.join(root, f)
-                              arcname = 'assets/' + os.path.relpath(full_path, dist_dir)
-                              with open(full_path, 'rb') as df:
-                                  dst.writestr(arcname, df.read())
-                              print(f'  Added {arcname}')
-              shutil.move(tmp, apk)
-              print(f'Done: {apk}')
-
-          EOF
-
-      - name: Sign APK
-        if: steps.find-apk.outputs.apk_found == 'true'
-        run: |
-          KEYSTORE=/tmp/debug.keystore
-          if [ ! -f "$KEYSTORE" ]; then
-            keytool -genkey -v -keystore $KEYSTORE -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Debug, OU=Debug, O=Debug, L=Debug, ST=Debug, C=US"
-          fi
-          for APK in $(find src-tauri/gen/android -name "*.apk" -type f); do
-            SIGNED="${APK%.apk}-signed.apk"
-            $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks $KEYSTORE --ks-pass pass:android --key-pass pass:android --ks-key-alias androiddebugkey -out $SIGNED $APK
-            mv $SIGNED $APK
-            echo "Signed: $APK"
-          done
-
-      - name: Upload APK
-        if: steps.find-apk.outputs.apk_found == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: snake-game-apk
-          path: src-tauri/gen/android/**/*.apk
-          retention-days: 5
-
-      - name: Create Release
-        if: steps.find-apk.outputs.apk_found == 'true'
-        uses: softprops/action-gh-release@v2
-        with:
-          files: src-tauri/gen/android/**/*.apk
-          tag_name: v${{ github.run_number }}
-          name: Snake Game v${{ github.run_number }}
-          draft: false
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: 'Snake Game v__VERSION__'
+          releaseBody: 'Snake Game Android APK'
+          draft: false
+          prerelease: false
+          artifactsPath: src-tauri/gen/android/**/*.apk
