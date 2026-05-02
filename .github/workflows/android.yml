@@ -64,12 +64,16 @@ jobs:
 
       - name: Build Android APK
         run: |
-          echo "=== Building with tauri ==="
-          npx tauri build --target aarch64-linux-android --bundles apk 2>&1
+          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang"
+          export CC="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang"
+          export CXX="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang++"
+          echo "=== Building with custom linker ==="
+          npx tauri build --target aarch64-linux-android 2>&1
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
           NDK_HOME: ${{ env.NDK_HOME }}
+          CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER: ${{ env.NDK_HOME }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang
 
       - name: Check build output
         run: |
