@@ -42,9 +42,6 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_HOME"
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
           echo "NDK_HOME=$NDK_HOME"
-          echo "JAVA_HOME=$JAVA_HOME"
-          ls -la $ANDROID_HOME/ndk/ 2>/dev/null || echo "No NDK dir"
-          ls $ANDROID_HOME/ndk/*/ 2>/dev/null | head -5
           find $ANDROID_HOME/ndk -name "aarch64-linux-android-clang" 2>/dev/null | head -3
 
       - name: Setup Rust
@@ -66,10 +63,10 @@ jobs:
           npx tauri android init 2>&1 || true
 
       - name: Build with cargo-apk
-        continue-on-error: true
         run: |
           cd src-tauri
           cargo apk build --release 2>&1 | tee /tmp/build.log
+          echo "EXIT_CODE=${PIPESTATUS[0]}" >> /tmp/build.env
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
@@ -79,22 +76,22 @@ jobs:
       - name: Show build log
         run: |
           echo "=== Build log ==="
-          cat /tmp/build.log
+          cat /tmp/build.log 2>/dev/null || echo "No build log"
           echo "=== End build log ==="
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: /tmp/build.log
+          retention-days: 1
 
       - name: Find APK
         run: |
           echo "=== Finding APKs ==="
           find src-tauri/target -name "*.apk" -type f 2>/dev/null
           ls -la src-tauri/target/aarch64-linux-android/release/apk/ 2>/dev/null || echo "No APK dir"
-          ls -la src-tauri/target/*/release/apk/ 2>/dev/null || echo "No APK in other targets"
-
-      - name: Upload build log
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: /tmp/build.log
-          retention-days: 1
 
       - name: Upload APK
         if: success()
