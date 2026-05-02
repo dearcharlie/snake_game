@@ -63,9 +63,13 @@ jobs:
       - name: Find APK
         id: find-apk
         run: |
-          APKS=$(find src-tauri/gen/android -name "*.apk" -type f 2>/dev/null)
-          echo "=== APKs found ==="
-          for a in $APKS; do echo "$a ($(du -h $a | cut -f1))"; done
+          echo "=== Searching for APK ==="
+          find src-tauri/gen/android -name "*.apk" -type f 2>/dev/null
+          echo "---"
+          find . -name "*.apk" -type f 2>/dev/null
+          echo "---"
+          ls -la src-tauri/gen/android/app/build/outputs/apk/release/ 2>/dev/null || echo "No release APK dir"
+          APKS=$(find . -name "*.apk" -type f 2>/dev/null)
           if [ -n "$APKS" ]; then echo "apk_found=true" >> $GITHUB_OUTPUT; else echo "apk_found=false" >> $GITHUB_OUTPUT; fi
 
       - name: Sign APK
