@@ -112,6 +112,8 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: src-tauri/gen/android/**/*.apk
+          tag: v${{ github.run_number }}
+          name: Snake Game v${{ github.run_number }}
           draft: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
