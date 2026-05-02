@@ -52,8 +52,11 @@ jobs:
 
       - name: Build Android APK
         run: |
-          CLANG=$(find $ANDROID_HOME/ndk -name "aarch64-linux-android*-clang*" -type f 2>/dev/null | head -1)
-          echo "Using clang: $CLANG"
+          set -x
+          ANDROID_NDK_ROOT="$ANDROID_HOME/ndk/$(ls $ANDROID_HOME/ndk/ 2>/dev/null | head -1)"
+          echo "NDK root: $ANDROID_NDK_ROOT"
+          CLANG=$(find "$ANDROID_NDK_ROOT" -name "*aarch64-linux-android*clang*" 2>/dev/null | grep -v lib | head -1)
+          echo "Found clang: $CLANG"
           export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$CLANG"
           export CC="$CLANG"
           export CXX="${CLANG%clang}clang++"
@@ -66,17 +69,14 @@ jobs:
       - name: Find APK files
         id: find-apk
         run: |
-          echo "=== Searching for all APK files ==="
           APKS=$(find src-tauri/target -name "*.apk" -type f 2>/dev/null)
-          echo "$APKS"
+          echo "APKs found: $APKS"
           if [ -z "$APKS" ]; then
-            echo "WARNING: No APK files found!"
             echo "apk_found=false" >> $GITHUB_OUTPUT
           else
             echo "apk_found=true" >> $GITHUB_OUTPUT
           fi
-          echo "=== Target directory contents ==="
-          ls src-tauri/target/aarch64-linux-android/release/ 2>/dev/null | head -20
+          ls src-tauri/target/aarch64-linux-android/release/ 2>/dev/null | head -10
 
       - name: Upload APK
         if: steps.find-apk.outputs.apk_found == 'true'
