@@ -198,7 +198,7 @@ impl GameManager {
 mod mobile {
     use super::*;
 
-    pub struct AppState(Mutex<GameManager>);
+    pub struct AppState(pub Mutex<GameManager>);
 
     #[tauri::mobile_entry_point]
     pub fn run() {
