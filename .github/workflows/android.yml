@@ -63,10 +63,7 @@ jobs:
           set -x
           NDK_VERSION=$(ls $ANDROID_HOME/ndk/ 2>/dev/null | head -1)
           ANDROID_NDK_ROOT="$ANDROID_HOME/ndk/$NDK_VERSION"
-          echo "NDK_VERSION=$NDK_VERSION"
-          echo "NDK root: $ANDROID_NDK_ROOT"
           TOOLCHAIN="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          echo "Toolchain: $TOOLCHAIN"
           CLANG="$TOOLCHAIN/aarch64-linux-android33-clang"
           CXX="${CLANG%clang}clang++"
           export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$CLANG"
@@ -74,9 +71,8 @@ jobs:
           export CXX="$CXX"
           export ANDROID_NDK_ROOT="$ANDROID_NDK_ROOT"
           export PATH="$TOOLCHAIN:$PATH"
-          echo "LINKER=$CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER"
           cd src-tauri
-          cargo apk build --target aarch64-linux-android 2>&1 | tee /tmp/build.log
+          cargo apk build --target aarch64-linux-android --release 2>&1 | tee /tmp/build.log
           echo "BUILD_EXIT=${PIPESTATUS[0]}" >> /tmp/build.env
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
