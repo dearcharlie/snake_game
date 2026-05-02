@@ -68,6 +68,11 @@ jobs:
           cd src-tauri
           rm -rf gen/android
           npx tauri android init 2>&1 | tee /tmp/init.log
+          # Copy frontend dist to Android assets BEFORE gradle build
+          mkdir -p app/src/main/assets
+          cp -r ../dist/* app/src/main/assets/
+          echo "=== assets contents ==="
+          ls -la app/src/main/assets/
           npx tauri android build 2>&1 | tee /tmp/build.log
           echo "BUILD_EXIT=${PIPESTATUS[0]}" >> /tmp/build.env
 
