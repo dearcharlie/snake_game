@@ -37,13 +37,6 @@ jobs:
       - name: Accept licenses
         run: yes | sdkmanager --licenses 2>/dev/null || true
 
-      - name: Debug Android env
-        run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          echo "NDK_HOME=$NDK_HOME"
-          find $ANDROID_HOME/ndk -name "aarch64-linux-android24-clang" 2>/dev/null | head -3
-
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -52,17 +45,58 @@ jobs:
       - name: Build frontend
         run: npm run build
 
+      - name: Detect NDK toolchain
+        run: |
+          echo "=== NDK Home ==="
+          echo "NDK_HOME=$NDK_HOME"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          echo ""
+          echo "=== NDK directory structure ==="
+          ls -la $ANDROID_HOME/ndk/ 2>/dev/null || echo "No NDK dir"
+          echo ""
+          echo "=== Looking for clang ==="
+          find $ANDROID_HOME/ndk -name "aarch64-linux-android*-clang*" 2>/dev/null | head -10
+          echo ""
+          echo "=== NDK toolchains ==="
+          ls -la $ANDROID_HOME/ndk/*/toolchains/llvm/prebuilt/*/bin/aarch64-linux-android*-clang* 2>/dev/null | head -5
+
       - name: Build Android APK
         run: |
-          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang"
-          export CC="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang"
-          export CXX="$NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang++"
-          npx tauri build --target aarch64-linux-android
+          echo "=== Detecting clang path ==="
+          CLANG=$(find $ANDROID_HOME/ndk -name "aarch64-linux-android*-clang*" -type f 2>/dev/null | head -1)
+          echo "Found clang: $CLANG"
+          if [ -z "$CLANG" ]; then
+            echo "ERROR: No clang found in NDK"
+            exit 1
+          fi
+          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$CLANG"
+          export CC="$CLANG"
+          export CXX="${CLANG%clang}clang++"
+          echo "CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER=$CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER"
+          echo ""
+          echo "=== Building ==="
+          npx tauri build --target aarch64-linux-android 2>&1 | tee /tmp/build.log
+          echo "EXIT_CODE=${PIPESTATUS[0]}" >> /tmp/build.env
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
           NDK_HOME: ${{ env.NDK_HOME }}
-          CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER: ${{ env.NDK_HOME }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang
+
+      - name: Show build log
+        if: always()
+        run: |
+          echo "=== Build log ==="
+          cat /tmp/build.log 2>/dev/null | tail -100
+          echo "=== End build log ==="
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: /tmp/build.log
+          retention-days: 1
 
       - name: Find APK
         run: |
