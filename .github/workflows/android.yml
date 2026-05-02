@@ -94,7 +94,8 @@ jobs:
       - name: Find APK files
         id: find-apk
         run: |
-          APKS=$(find src-tauri/target -name "*.apk" -type f 2>/dev/null)
+          # APK from tauri android build is in gen/android/
+          APKS=$(find src-tauri/gen/android -name "*.apk" -type f 2>/dev/null)
           echo "APKs found: $APKS"
           echo "apk_found=$(if [ -z "$APKS" ]; then echo "false"; else echo "true"; fi)" >> $GITHUB_OUTPUT
 
@@ -103,14 +104,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: snake-game-apk
-          path: src-tauri/target/**/*.apk
+          path: src-tauri/gen/android/**/*.apk
           retention-days: 5
 
       - name: Create Release
         if: steps.find-apk.outputs.apk_found == 'true'
         uses: softprops/action-gh-release@v1
         with:
-          files: src-tauri/target/**/*.apk
+          files: src-tauri/gen/android/**/*.apk
           draft: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
