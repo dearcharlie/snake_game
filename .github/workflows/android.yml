@@ -52,34 +52,33 @@ jobs:
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
           JAVA_HOME: ${{ env.JAVA_HOME }}
 
-      - name: Debug env
-        run: |
-          echo "JAVA_HOME=$JAVA_HOME"
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "NDK_HOME=$NDK_HOME"
-          ls $ANDROID_HOME 2>/dev/null || echo "ANDROID_HOME empty"
-          npx tauri build -v 2>&1 | tail -50
+      - name: Build Android APK
+        run: npx tauri build
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
           JAVA_HOME: ${{ env.JAVA_HOME }}
 
       - name: Find APK
-        run: find src-tauri/target -name "*.apk" -type f
+        id: find-apk
+        run: |
+          APK=$(find src-tauri/target -name "*.apk" -type f 2>/dev/null | head -1)
+          echo "Found APK: $APK"
+          echo "apk_path=$APK" >> $GITHUB_OUTPUT
 
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: snake-game-apk
-          path: src-tauri/target/**/release/**/*.apk
+          path: src-tauri/target/**/*.apk
           retention-days: 5
 
       - name: Create Release
         if: success()
         uses: softprops/action-gh-release@v1
         with:
-          files: src-tauri/target/**/release/**/*.apk
+          files: src-tauri/target/**/*.apk
           draft: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
