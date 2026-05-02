@@ -69,19 +69,60 @@ jobs:
           rm -rf gen/android
           npx tauri android init 2>&1 | tee /tmp/init.log
 
-          # Modify Gradle config to include dist as additional assets source
-          # This MUST happen after init but before build
-          if [ -f app/build.gradle ]; then
-            echo "=== Adding dist to assets srcDirs in build.gradle ==="
-            sed -i "s|assets.srcDirs = \[|assets.srcDirs = ['../../../dist', |" app/build.gradle
-            grep -A2 "assets.srcDirs" app/build.gradle || echo "sed failed, trying alternate"
-            # Also try the other common pattern
-            sed -i "s|assets\.srcDirs = \[|assets.srcDirs = ['../../../dist', |" app/build.gradle
-          fi
-
-          # Check what gen/android structure looks like
-          find . -name "build.gradle" -path "*/gen/android/*" 2>/dev/null
-          cat app/build.gradle 2>/dev/null | head -30
+          # Use Python to precisely patch build.gradle to add dist as additional assets source
+          python3 << 'PYEOF'
+          import re, os
+          gradle_file = 'app/build.gradle'
+          if not os.path.exists(gradle_file):
+              print(f'{gradle_file} not found')
+              exit(1)
+          
+          with open(gradle_file, 'r') as f:
+              content = f.read()
+          
+          # Check if already patched
+          if '../../../dist' in content:
+              print('Already patched')
+          else:
+              # Find the android {} block and add assets srcDirs
+              # The typical pattern is: assets.srcDirs = ['src/main/assets']
+              # We want to change it to include ../../../dist
+              old_line = "assets.srcDirs = ['src/main/assets']"
+              new_line = "assets.srcDirs = ['../../../dist', 'src/main/assets']"
+              
+              if old_line in content:
+                  content = content.replace(old_line, new_line)
+                  print(f'Patched: {old_line} -> {new_line}')
+              else:
+                  # Try regex to find and replace the assets.srcDirs line
+                  pattern = r"(assets\.srcDirs\s*=\s*\[[^\]]*\])"
+                  match = re.search(pattern, content)
+                  if match:
+                      old = match.group(1)
+                      # Prepend ../../../dist to the list
+                      new = old.replace('[', "['../../../dist', ", 1)
+                      content = content.replace(old, new)
+                      print(f'Patched via regex: {old} -> {new}')
+                  else:
+                      # Last resort: find any line with assets.srcDirs and replace
+                      lines = content.split('\n')
+                      for i, line in enumerate(lines):
+                          if 'assets.srcDirs' in line and '=' in line:
+                              print(f'Found line {i}: {line.strip()}')
+                              lines[i] = line.replace("['src/main/assets']", "['../../../dist', 'src/main/assets']")
+                              print(f'Replaced with: {lines[i].strip()}')
+                      content = '\n'.join(lines)
+              
+              with open(gradle_file, 'w') as f:
+                  f.write(content)
+              print('build.gradle updated')
+          
+          # Verify
+          with open(gradle_file, 'r') as f:
+              for line in f:
+                  if 'assets.srcDirs' in line:
+                      print(f'VERIFY: {line.strip()}')
+          PYEOF
 
           npx tauri android build 2>&1 | tee /tmp/build.log
           echo "BUILD_EXIT=${PIPESTATUS[0]}" >> /tmp/build.env
