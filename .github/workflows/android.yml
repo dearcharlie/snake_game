@@ -66,8 +66,12 @@ jobs:
           export PATH="$TOOLCHAIN:$PATH"
           echo "NDK=$ANDROID_NDK_ROOT CLANG=$CLANG"
           cd src-tauri
-          # Try with target - if bundling fails we'll at least have the binary
-          npx tauri build --target aarch64-linux-android 2>&1 | tee /tmp/build.log
+          # Initialize Android project if not exists
+          if [ ! -d "gen/android" ]; then
+            npx tauri android init 2>&1 | tee /tmp/init.log
+          fi
+          # Build Android APK via Gradle
+          npx tauri android build 2>&1 | tee /tmp/build.log
           echo "BUILD_EXIT=${PIPESTATUS[0]}" >> /tmp/build.env
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
