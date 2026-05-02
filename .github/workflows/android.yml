@@ -55,6 +55,8 @@ jobs:
         continue-on-error: true
         run: |
           set -x
+          pwd
+          ls -la
           NDK_VERSION=$(ls $ANDROID_HOME/ndk/ 2>/dev/null | head -1)
           ANDROID_NDK_ROOT="$ANDROID_HOME/ndk/$NDK_VERSION"
           TOOLCHAIN="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
@@ -65,67 +67,26 @@ jobs:
           export CXX="$CXX"
           export ANDROID_NDK_ROOT="$ANDROID_NDK_ROOT"
           export PATH="$TOOLCHAIN:$PATH"
-          echo "NDK=$ANDROID_NDK_ROOT CLANG=$CLANG"
+          echo "NDK=$ANDROID_NDK_ROOT"
+          echo "CLANG=$CLANG"
+          echo "=== Checking tauri CLI ==="
+          npx tauri android --version 2>&1 || echo "tauri android not available"
           cd src-tauri
+          pwd
+          echo "=== gen/android before init ==="
+          ls -la gen/ 2>/dev/null || echo "gen/ does not exist"
           rm -rf gen/android
-          npx tauri android init 2>&1 | tee /tmp/init.log
-
-          # Use Python to precisely patch build.gradle to add dist as additional assets source
-          python3 << 'PYEOF'
-          import re, os
-          gradle_file = 'app/build.gradle'
-          if not os.path.exists(gradle_file):
-              print(f'{gradle_file} not found')
-              exit(1)
-          
-          with open(gradle_file, 'r') as f:
-              content = f.read()
-          
-          # Check if already patched
-          if '../../../dist' in content:
-              print('Already patched')
-          else:
-              # Find the android {} block and add assets srcDirs
-              # The typical pattern is: assets.srcDirs = ['src/main/assets']
-              # We want to change it to include ../../../dist
-              old_line = "assets.srcDirs = ['src/main/assets']"
-              new_line = "assets.srcDirs = ['../../../dist', 'src/main/assets']"
-              
-              if old_line in content:
-                  content = content.replace(old_line, new_line)
-                  print(f'Patched: {old_line} -> {new_line}')
-              else:
-                  # Try regex to find and replace the assets.srcDirs line
-                  pattern = r"(assets\.srcDirs\s*=\s*\[[^\]]*\])"
-                  match = re.search(pattern, content)
-                  if match:
-                      old = match.group(1)
-                      # Prepend ../../../dist to the list
-                      new = old.replace('[', "['../../../dist', ", 1)
-                      content = content.replace(old, new)
-                      print(f'Patched via regex: {old} -> {new}')
-                  else:
-                      # Last resort: find any line with assets.srcDirs and replace
-                      lines = content.split('\n')
-                      for i, line in enumerate(lines):
-                          if 'assets.srcDirs' in line and '=' in line:
-                              print(f'Found line {i}: {line.strip()}')
-                              lines[i] = line.replace("['src/main/assets']", "['../../../dist', 'src/main/assets']")
-                              print(f'Replaced with: {lines[i].strip()}')
-                      content = '\n'.join(lines)
-              
-              with open(gradle_file, 'w') as f:
-                  f.write(content)
-              print('build.gradle updated')
-          
-          # Verify
-          with open(gradle_file, 'r') as f:
-              for line in f:
-                  if 'assets.srcDirs' in line:
-                      print(f'VERIFY: {line.strip()}')
-          PYEOF
-
-          npx tauri android build 2>&1 | tee /tmp/build.log
+          echo "=== After rm, gen/ ==="
+          ls -la gen/ 2>/dev/null || echo "gen/ does not exist"
+          echo "=== Running android init ==="
+          npx tauri android init --ci 2>&1 | head -30
+          echo "=== gen/android after init ==="
+          ls -la gen/ 2>/dev/null || echo "gen/ does not exist"
+          ls -la gen/android/ 2>/dev/null || echo "gen/android does not exist"
+          echo "=== build.gradle content ==="
+          cat gen/android/app/build.gradle 2>/dev/null | head -50
+          echo "=== Running actual tauri android build ==="
+          npx tauri android build --release 2>&1 | tee /tmp/build.log
           echo "BUILD_EXIT=${PIPESTATUS[0]}" >> /tmp/build.env
 
       - name: Check build result
