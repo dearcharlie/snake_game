@@ -50,13 +50,6 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-      - name: Install Android platforms and build-tools
-        run: |
-          yes | sdkmanager --install "platforms;android-30" "platforms;android-33" 2>&1 | tail -5
-
-      - name: Install cargo-apk
-        run: cargo install cargo-apk
-
       - name: Build Android APK
         continue-on-error: true
         run: |
@@ -71,8 +64,10 @@ jobs:
           export CXX="$CXX"
           export ANDROID_NDK_ROOT="$ANDROID_NDK_ROOT"
           export PATH="$TOOLCHAIN:$PATH"
+          echo "NDK=$ANDROID_NDK_ROOT CLANG=$CLANG"
           cd src-tauri
-          cargo apk build --release --target aarch64-linux-android 2>&1 | tee /tmp/build.log
+          # Build without --target; tauri will handle Android natively
+          npx tauri build 2>&1 | tee /tmp/build.log
           echo "BUILD_EXIT=${PIPESTATUS[0]}" >> /tmp/build.env
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
@@ -82,8 +77,7 @@ jobs:
       - name: Check build result
         run: |
           echo "Exit code: $(cat /tmp/build.env 2>/dev/null)"
-          echo "=== Last 50 lines of build log ==="
-          tail -50 /tmp/build.log 2>/dev/null || echo "No log"
+          tail -60 /tmp/build.log 2>/dev/null || echo "No log"
 
       - name: Upload build log
         if: always()
