@@ -50,6 +50,10 @@ jobs:
       - name: Build frontend
         run: npm run build
 
+      - name: Install Android platforms and build-tools
+        run: |
+          yes | sdkmanager --install "platforms;android-30" "platforms;android-33" 2>&1 | tail -5
+
       - name: Install cargo-apk
         run: cargo install cargo-apk
 
