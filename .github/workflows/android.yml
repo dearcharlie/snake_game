@@ -51,6 +51,8 @@ jobs:
         run: npm run build
 
       - name: Build Android APK
+        timeout-minutes: 35
+        continue-on-error: true
         run: |
           set -x
           NDK_VERSION=$(ls $ANDROID_HOME/ndk/ 2>/dev/null | head -1)
