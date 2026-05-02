@@ -50,6 +50,20 @@ jobs:
       - name: Build frontend
         run: npm run build
 
+      - name: Copy frontend dist to Android assets
+        run: |
+          if [ -d "dist" ] && [ -d "src-tauri/gen/android/app/src/main/assets" ]; then
+            cp -r dist/* src-tauri/gen/android/app/src/main/assets/
+            echo "Copied dist to Android assets"
+          elif [ -d "dist" ]; then
+            mkdir -p src-tauri/gen/android/app/src/main/assets
+            cp -r dist/* src-tauri/gen/android/app/src/main/assets/
+            echo "Created assets dir and copied dist"
+          else
+            echo "Warning: dist directory not found"
+          fi
+          ls -la src-tauri/gen/android/app/src/main/assets/ 2>/dev/null || echo "assets dir not found"
+
       - name: Build Android APK
         continue-on-error: true
         run: |
