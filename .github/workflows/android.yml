@@ -14,7 +14,7 @@ permissions:
 jobs:
   build-android:
     runs-on: ubuntu-22.04
-    
+
     steps:
       - uses: actions/checkout@v4
 
@@ -50,14 +50,35 @@ jobs:
         with:
           workspaces: src-tauri
 
+      - name: Check available targets
+        run: |
+          echo "=== Rust targets ==="
+          rustup target list --installed
+          echo "=== Android SDK ==="
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          echo "NDK_HOME=$NDK_HOME"
+          ls -la $ANDROID_HOME/ndk/ 2>/dev/null || echo "No NDK found"
+          echo "=== Tauri targets ==="
+          cat src-tauri/tauri.conf.json | grep -A5 '"bundle"'
+
       - name: Build Android APK
-        run: npm run tauri build
+        run: |
+          echo "=== Building with tauri ==="
+          npx tauri build --target aarch64-linux-android --bundles apk 2>&1
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
           NDK_HOME: ${{ env.NDK_HOME }}
 
+      - name: Check build output
+        run: |
+          echo "=== Looking for APKs ==="
+          find src-tauri/target -name "*.apk" 2>/dev/null
+          ls -la src-tauri/target/*/release/bundle/ 2>/dev/null || echo "No bundle dir"
+
       - name: Upload APK
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
