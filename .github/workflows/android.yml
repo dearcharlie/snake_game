@@ -44,7 +44,8 @@ jobs:
           echo "NDK_HOME=$NDK_HOME"
           echo "JAVA_HOME=$JAVA_HOME"
           ls -la $ANDROID_HOME/ndk/ 2>/dev/null || echo "No NDK dir"
-          ls -la $ANDROID_HOME/ 2>/dev/null | head -10
+          ls $ANDROID_HOME/ndk/*/ 2>/dev/null | head -5
+          find $ANDROID_HOME/ndk -name "aarch64-linux-android-clang" 2>/dev/null | head -3
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -62,27 +63,38 @@ jobs:
       - name: Init Android project
         run: |
           cd src-tauri
-          echo "=== Init Android ==="
           npx tauri android init 2>&1 || true
-          echo "=== Init done ==="
 
       - name: Build with cargo-apk
+        continue-on-error: true
         run: |
           cd src-tauri
-          echo "=== Build start ==="
-          cargo apk build --release 2>&1
-          echo "=== Build end ==="
+          cargo apk build --release 2>&1 | tee /tmp/build.log
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
           NDK_HOME: ${{ env.NDK_HOME }}
           JAVA_HOME: ${{ env.JAVA_HOME }}
 
+      - name: Show build log
+        run: |
+          echo "=== Build log ==="
+          cat /tmp/build.log
+          echo "=== End build log ==="
+
       - name: Find APK
         run: |
           echo "=== Finding APKs ==="
           find src-tauri/target -name "*.apk" -type f 2>/dev/null
           ls -la src-tauri/target/aarch64-linux-android/release/apk/ 2>/dev/null || echo "No APK dir"
+          ls -la src-tauri/target/*/release/apk/ 2>/dev/null || echo "No APK in other targets"
+
+      - name: Upload build log
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: /tmp/build.log
+          retention-days: 1
 
       - name: Upload APK
         if: success()
