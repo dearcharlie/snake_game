@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build-android:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v4
@@ -23,16 +23,55 @@ jobs:
       - name: Install frontend deps
         run: npm ci
 
-      - name: Build Tauri Android APK
-        uses: tauri-apps/tauri-action@v0
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v2
+        with:
+          ndk-version: r26b
+
+      - name: Accept licenses
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Install cargo-apk
+        run: |
+          rustup target add aarch64-linux-android
+          cargo install cargo-apk
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Build Android APK
+        run: |
+          cd src-tauri
+          cargo apk build --target aarch64-linux-android --release
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+          NDK_HOME: ${{ env.NDK_HOME }}
+
+      - name: Find APK
+        run: |
+          find src-tauri/target -name "*.apk" -type f
+          ls -la src-tauri/target/aarch64-linux-android/release/apk/ 2>/dev/null || echo "No APK dir"
+
+      - name: Upload APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: snake-game-apk
+          path: src-tauri/target/aarch64-linux-android/release/apk/*.apk
+          retention-days: 5
+
+      - name: Create Release
+        if: success()
+        uses: softprops/action-gh-release@v1
+        with:
+          files: src-tauri/target/aarch64-linux-android/release/apk/*.apk
+          draft: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: v__VERSION__
-          releaseName: 'Snake Game v__VERSION__'
-          releaseBody: 'Android APK release'
-          releaseDraft: false
-          prerelease: false
-          artifactPaths: |
-            src-tauri/target/*/release/bundle/apk/**/*.apk
-          artifactFormat: apk
