@@ -29,7 +29,7 @@ log = "0.4"
 tauri-plugin-opener = "2"
 
 [profile.release]
-panic = "unwind"
+panic = "abort"
 codegen-units = 1
 lto = true
 opt-level = "s"
