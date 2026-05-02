@@ -58,5 +58,15 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: src-tauri/target/*/release/bundle/apk/*.apk
+          path: src-tauri/target/*/release/bundle/apk/**/*.apk
           retention-days: 5
+
+      - name: Create Release
+        if: success()
+        uses: softprops/action-gh-release@v1
+        with:
+          files: src-tauri/target/*/release/bundle/apk/**/*.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
