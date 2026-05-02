@@ -55,23 +55,14 @@ jobs:
         run: |
           cd src-tauri
           echo "=== Building Rust library ==="
-          cargo build --target aarch64-linux-android --release 2>&1 | tail -10
+          cargo build --target aarch64-linux-android --release 2>&1 | tail -5
           echo "=== Rust artifacts ==="
-          ls -la target/aarch64-linux-android/release/*.so 2>/dev/null
-          echo "=== Running tauri android init ==="
-          npx tauri android init --ci 2>&1 | tail -10
-          echo "=== Copying native libs ==="
-          mkdir -p gen/android/app/src/main/jniLibs/aarch64-linux-android/
-          cp target/aarch64-linux-android/release/*.so gen/android/app/src/main/jniLibs/aarch64-linux-android/ 2>/dev/null && echo "Copied .so files" || echo "No .so files to copy"
-          echo "=== Copying dist files ==="
-          cp -r ../dist/* gen/android/app/src/main/assets/ 2>/dev/null && echo "Copied dist" || echo "No dist to copy"
-          echo "=== jniLibs ==="
-          find gen/android -name "*.so" 2>/dev/null
-          echo "=== assets ==="
-          ls gen/android/app/src/main/assets/ 2>/dev/null || echo "No assets"
+          ls -la target/aarch64-linux-android/release/*.so 2>/dev/null || echo "No .so"
+          echo "=== Copying dist ==="
+          mkdir -p gen/android/app/src/main/assets/
+          cp -r ../dist/* gen/android/app/src/main/assets/ 2>/dev/null && echo "Copied dist" || echo "No dist"
           echo "=== Building APK ==="
-          cd gen/android
-          ./gradlew assembleRelease 2>&1 | tail -30
+          npx tauri android build 2>&1 | tail -30
 
       - name: Find APK
         id: find-apk
