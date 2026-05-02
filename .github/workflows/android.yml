@@ -68,11 +68,21 @@ jobs:
           cd src-tauri
           rm -rf gen/android
           npx tauri android init 2>&1 | tee /tmp/init.log
-          # Copy frontend dist to Android assets BEFORE gradle build
-          mkdir -p app/src/main/assets
-          cp -r ../dist/* app/src/main/assets/
-          echo "=== assets contents ==="
-          ls -la app/src/main/assets/
+
+          # Modify Gradle config to include dist as additional assets source
+          # This MUST happen after init but before build
+          if [ -f app/build.gradle ]; then
+            echo "=== Adding dist to assets srcDirs in build.gradle ==="
+            sed -i "s|assets.srcDirs = \[|assets.srcDirs = ['../../../dist', |" app/build.gradle
+            grep -A2 "assets.srcDirs" app/build.gradle || echo "sed failed, trying alternate"
+            # Also try the other common pattern
+            sed -i "s|assets\.srcDirs = \[|assets.srcDirs = ['../../../dist', |" app/build.gradle
+          fi
+
+          # Check what gen/android structure looks like
+          find . -name "build.gradle" -path "*/gen/android/*" 2>/dev/null
+          cat app/build.gradle 2>/dev/null | head -30
+
           npx tauri android build 2>&1 | tee /tmp/build.log
           echo "BUILD_EXIT=${PIPESTATUS[0]}" >> /tmp/build.env
 
