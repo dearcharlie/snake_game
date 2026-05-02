@@ -2,7 +2,8 @@ name: Build Android APK
 
 on:
   push:
-    branches: [main]
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 permissions:
@@ -24,9 +25,7 @@ jobs:
         run: npm ci
 
       - name: Build frontend
-        run: |
-          npm run build
-          ls -la dist/ | head -10
+        run: npm run build
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -52,92 +51,22 @@ jobs:
         with:
           workspaces: src-tauri
 
-      - name: Build Android APK (cross-compile)
+      - name: Build Android APK
         run: |
-          set -x
-          NDK_VERSION=$(ls $ANDROID_HOME/ndk/ 2>/dev/null | head -1)
-          ANDROID_NDK_ROOT="$ANDROID_HOME/ndk/$NDK_VERSION"
-          TOOLCHAIN="$ANDROID_NDK_ROOT/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          CLANG="$TOOLCHAIN/aarch64-linux-android33-clang"
-          CXX="${CLANG%clang}clang++"
-          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$CLANG"
-          export CC="$CLANG"
-          export CXX="$CXX"
-          export ANDROID_NDK_ROOT="$ANDROID_NDK_ROOT"
-          export PATH="$TOOLCHAIN:$PATH"
-          echo "NDK=$ANDROID_NDK_ROOT CLANG=$CLANG"
-
           cd src-tauri
-
-          # Build Rust library for Android
           cargo build --target aarch64-linux-android --release 2>&1 | tail -5
-
-          # Check if .so was built
-          find . -name "*.so" 2>/dev/null | head -5
-          ls -la target/aarch64-linux-android/release/*.so 2>/dev/null || echo "No .so in release"
-
-          # Use tauri android init + build
-          rm -rf gen/android
-          npx tauri android init --ci 2>&1 | tail -10
-
-          # Copy dist files into gen/android assets
-          mkdir -p gen/android/app/src/main/assets
+          npx tauri android init --ci 2>&1 | tail -5
           cp -r ../dist/* gen/android/app/src/main/assets/
-          echo "=== Copied dist to assets ==="
-          ls -la gen/android/app/src/main/assets/
-
-          # Build APK with gradle
           cd gen/android
-          ./gradlew assembleRelease 2>&1 | tail -20
-          echo "GRADLE_EXIT=$?"
+          ./gradlew assembleRelease 2>&1 | tail -10
 
       - name: Find APK
         id: find-apk
         run: |
-          echo "=== Looking for APK ==="
-          find src-tauri/gen/android -name "*.apk" -type f 2>/dev/null
           APKS=$(find src-tauri/gen/android -name "*.apk" -type f 2>/dev/null)
-          FOUND="false"
-          if [ -n "$APKS" ]; then FOUND="true"; echo "APK found!"; fi
-          echo "apk_found=$FOUND" >> $GITHUB_OUTPUT
-
-      - name: Inject dist into APK
-        if: steps.find-apk.outputs.apk_found == 'true'
-        run: |
-          python3 << 'EOF'
-          import zipfile, os, shutil, tempfile
-
-          apks = []
-          for root, dirs, files in os.walk('src-tauri/gen/android'):
-              for f in files:
-                  if f.endswith('.apk'):
-                      apks.append(os.path.join(root, f))
-
-          dist_dir = '../dist'
-          if not os.path.exists(dist_dir):
-              print('dist not found')
-              exit(0)
-
-          for apk in apks:
-              print(f'Processing: {apk}')
-              tmp = tempfile.mktemp(suffix='.apk')
-              with zipfile.ZipFile(apk, 'r') as src:
-                  with zipfile.ZipFile(tmp, 'w', zipfile.ZIP_DEFLATED) as dst:
-                      for item in src.infolist():
-                          data = src.read(item.filename)
-                          if not item.filename.startswith('assets/') or item.filename == 'assets/tauri.conf.json':
-                              dst.writestr(item, data)
-                      for root, dirs, files in os.walk(dist_dir):
-                          for f in files:
-                              full_path = os.path.join(root, f)
-                              arcname = os.path.relpath(full_path, dist_dir)
-                              with open(full_path, 'rb') as df:
-                                  dst.writestr(arcname, df.read())
-                              print(f'  Added: {arcname}')
-              shutil.move(tmp, apk)
-              print(f'Done: {apk}')
-
-          EOF
+          echo "=== APKs found ==="
+          for a in $APKS; do echo "$a ($(du -h $a | cut -f1))"; done
+          if [ -n "$APKS" ]; then echo "apk_found=true" >> $GITHUB_OUTPUT; else echo "apk_found=false" >> $GITHUB_OUTPUT; fi
 
       - name: Sign APK
         if: steps.find-apk.outputs.apk_found == 'true'
@@ -163,10 +92,10 @@ jobs:
 
       - name: Create Release
         if: steps.find-apk.outputs.apk_found == 'true'
-        uses: ncipollo/release-action@v1
+        uses: softprops/action-gh-release@v2
         with:
-          artifacts: src-tauri/gen/android/**/*.apk
-          tag: v${{ github.run_number }}
-          name: Snake Game v${{ github.run_number }}
+          files: src-tauri/gen/android/**/*.apk
+          draft: false
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
