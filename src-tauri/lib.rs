@@ -202,16 +202,11 @@ mod mobile {
 
     #[tauri::mobile_entry_point]
     pub fn run() {
+        eprintln!("[DEBUG] Tauri mobile starting...");
         let builder = tauri::Builder::default()
             .plugin(tauri_plugin_shell::init())
-            .manage(AppState(Mutex::new(GameManager::new())))
-            .invoke_handler(tauri::generate_handler![
-                super::start_game,
-                super::get_game_state,
-                super::set_direction,
-                super::tick_game,
-                super::restart_game,
-            ]);
+            .manage(AppState(Mutex::new(GameManager::new())));
+        eprintln!("[DEBUG] Builder created, about to run...");
         builder
             .run(tauri::generate_context!())
             .expect("error while running tauri application");
