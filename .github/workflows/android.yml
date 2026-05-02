@@ -42,6 +42,17 @@ jobs:
         with:
           targets: aarch64-linux-android
 
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: npm-deps-${{ hashFiles('package-lock.json') }}
+
       - name: Build frontend
         run: npm run build
 
@@ -60,11 +71,11 @@ jobs:
           JAVA_HOME: ${{ env.JAVA_HOME }}
 
       - name: Find APK
-        id: find-apk
         run: |
+          set -e
           APK=$(find src-tauri/target -name "*.apk" -type f 2>/dev/null | head -1)
           echo "Found APK: $APK"
-          echo "apk_path=$APK" >> $GITHUB_OUTPUT
+          ls -la $APK
 
       - name: Upload APK
         if: success()
