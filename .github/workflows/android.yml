@@ -50,20 +50,6 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-      - name: Copy frontend dist to Android assets
-        run: |
-          if [ -d "dist" ] && [ -d "src-tauri/gen/android/app/src/main/assets" ]; then
-            cp -r dist/* src-tauri/gen/android/app/src/main/assets/
-            echo "Copied dist to Android assets"
-          elif [ -d "dist" ]; then
-            mkdir -p src-tauri/gen/android/app/src/main/assets
-            cp -r dist/* src-tauri/gen/android/app/src/main/assets/
-            echo "Created assets dir and copied dist"
-          else
-            echo "Warning: dist directory not found"
-          fi
-          ls -la src-tauri/gen/android/app/src/main/assets/ 2>/dev/null || echo "assets dir not found"
-
       - name: Build Android APK
         continue-on-error: true
         run: |
@@ -80,19 +66,8 @@ jobs:
           export PATH="$TOOLCHAIN:$PATH"
           echo "NDK=$ANDROID_NDK_ROOT CLANG=$CLANG"
           cd src-tauri
-          # Delete gen/android if exists (it's gitignored, so CI won't have it)
-          if [ -d "gen/android" ]; then
-            echo "Removing stale gen/android"
-            rm -rf gen/android
-          fi
+          rm -rf gen/android
           npx tauri android init 2>&1 | tee /tmp/init.log
-          # Copy frontend dist to Android assets
-          if [ -d "../dist" ]; then
-            mkdir -p app/src/main/assets
-            cp -r ../dist/* app/src/main/assets/
-            echo "Copied dist to Android assets"
-            ls -la app/src/main/assets/
-          fi
           npx tauri android build 2>&1 | tee /tmp/build.log
           echo "BUILD_EXIT=${PIPESTATUS[0]}" >> /tmp/build.env
 
@@ -117,6 +92,48 @@ jobs:
           FOUND="false"
           if [ -n "$APKS" ]; then FOUND="true"; fi
           echo "apk_found=$FOUND" >> $GITHUB_OUTPUT
+
+      - name: Inject frontend dist into APK
+        if: steps.find-apk.outputs.apk_found == 'true'
+        run: |
+          python3 << 'EOF'
+          import zipfile, os, shutil, tempfile
+
+          # Find APK
+          apks = []
+          for root, dirs, files in os.walk('src-tauri/gen/android'):
+              for f in files:
+                  if f.endswith('.apk'):
+                      apks.append(os.path.join(root, f))
+
+          # Find dist files
+          dist_dir = '../dist'
+          if not os.path.exists(dist_dir):
+              print('dist dir not found')
+              exit(0)
+
+          for apk in apks:
+              print(f'Injecting dist into {apk}')
+              tmp = tempfile.mktemp(suffix='.apk')
+              with zipfile.ZipFile(apk, 'r') as src:
+                  with zipfile.ZipFile(tmp, 'w', zipfile.ZIP_DEFLATED) as dst:
+                      for item in src.infolist():
+                          data = src.read(item.filename)
+                          # Skip old assets (but keep META-INF and other needed files)
+                          if not item.filename.startswith('assets/') or item.filename == 'assets/tauri.conf.json':
+                              dst.writestr(item, data)
+                      # Add dist files
+                      for root, dirs, files in os.walk(dist_dir):
+                          for f in files:
+                              full_path = os.path.join(root, f)
+                              arcname = 'assets/' + os.path.relpath(full_path, dist_dir)
+                              with open(full_path, 'rb') as df:
+                                  dst.writestr(arcname, df.read())
+                              print(f'  Added {arcname}')
+              shutil.move(tmp, apk)
+              print(f'Done: {apk}')
+
+          EOF
 
       - name: Sign APK
         if: steps.find-apk.outputs.apk_found == 'true'
