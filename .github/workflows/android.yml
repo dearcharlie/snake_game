@@ -42,16 +42,8 @@ jobs:
         with:
           targets: aarch64-linux-android
 
-      - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
-
-      - name: Cache npm
-        uses: actions/cache@v4
-        with:
-          path: node_modules
-          key: npm-deps-${{ hashFiles('package-lock.json') }}
+      - name: Install cargo-apk
+        run: cargo install cargo-apk
 
       - name: Build frontend
         run: npm run build
@@ -63,19 +55,22 @@ jobs:
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
           JAVA_HOME: ${{ env.JAVA_HOME }}
 
-      - name: Build Android APK
-        run: npx tauri build
+      - name: Build with cargo-apk
+        run: |
+          cd src-tauri
+          cargo apk build --release
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
           JAVA_HOME: ${{ env.JAVA_HOME }}
+          NDK_HOME: ${{ env.NDK_HOME }}
 
       - name: Find APK
         run: |
           set -e
           APK=$(find src-tauri/target -name "*.apk" -type f 2>/dev/null | head -1)
-          echo "Found APK: $APK"
-          ls -la $APK
+          echo "APK: $APK"
+          ls -la $APK 2>/dev/null || echo "APK not found"
 
       - name: Upload APK
         if: success()
