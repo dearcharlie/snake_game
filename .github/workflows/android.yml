@@ -45,11 +45,6 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-      - name: Detect NDK toolchain
-        run: |
-          echo "NDK_HOME=$NDK_HOME"
-          find $ANDROID_HOME/ndk -name "aarch64-linux-android*-clang*" 2>/dev/null | head -5
-
       - name: Build Android APK
         run: |
           CLANG=$(find $ANDROID_HOME/ndk -name "aarch64-linux-android*-clang*" -type f 2>/dev/null | head -1)
@@ -57,50 +52,41 @@ jobs:
           export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$CLANG"
           export CC="$CLANG"
           export CXX="${CLANG%clang}clang++"
-          npx tauri build --target aarch64-linux-android 2>&1 | tee /tmp/build.log
-          echo "EXIT_CODE=${PIPESTATUS[0]}" >> /tmp/build.env
+          npx tauri build --target aarch64-linux-android 2>&1
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
           NDK_HOME: ${{ env.NDK_HOME }}
 
-      - name: Show build log
-        if: always()
-        run: cat /tmp/build.log | tail -50
-
-      - name: Upload build log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: /tmp/build.log
-          retention-days: 1
-
-      - name: Find APK
+      - name: Find APK files
+        id: find-apk
         run: |
-          echo "=== Searching for APKs ==="
-          find src-tauri/target -name "*.apk" -type f 2>/dev/null
-          echo "=== Checking standard paths ==="
-          ls src-tauri/target/aarch64-linux-android/release/bundle/apk/ 2>/dev/null && echo "Found in bundle/apk" || true
-          ls src-tauri/target/aarch64-linux-android/release/apk/ 2>/dev/null && echo "Found in release/apk" || true
+          echo "=== Searching for all APK files ==="
+          APKS=$(find src-tauri/target -name "*.apk" -type f 2>/dev/null)
+          echo "$APKS"
+          if [ -z "$APKS" ]; then
+            echo "WARNING: No APK files found!"
+            echo "apk_found=false" >> $GITHUB_OUTPUT
+          else
+            echo "apk_found=true" >> $GITHUB_OUTPUT
+            echo "apk_paths=$APKS" >> $GITHUB_OUTPUT
+          fi
+          echo "=== Target directory contents ==="
+          ls -la src-tauri/target/aarch64-linux-android/release/ 2>/dev/null | head -20
 
       - name: Upload APK
-        if: success()
+        if: steps.find-apk.outputs.apk_found == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: snake-game-apk
-          path: |
-            src-tauri/target/aarch64-linux-android/release/bundle/apk/*.apk
-            src-tauri/target/aarch64-linux-android/release/apk/*.apk
+          path: src-tauri/target/**/*.apk
           retention-days: 5
 
       - name: Create Release
-        if: success()
+        if: steps.find-apk.outputs.apk_found == 'true'
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            src-tauri/target/aarch64-linux-android/release/bundle/apk/*.apk
-            src-tauri/target/aarch64-linux-android/release/apk/*.apk
+          files: src-tauri/target/**/*.apk
           draft: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
