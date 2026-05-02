@@ -80,8 +80,18 @@ jobs:
           export PATH="$TOOLCHAIN:$PATH"
           echo "NDK=$ANDROID_NDK_ROOT CLANG=$CLANG"
           cd src-tauri
-          if [ ! -d "gen/android" ]; then
-            npx tauri android init 2>&1 | tee /tmp/init.log
+          # Delete gen/android if exists (it's gitignored, so CI won't have it)
+          if [ -d "gen/android" ]; then
+            echo "Removing stale gen/android"
+            rm -rf gen/android
+          fi
+          npx tauri android init 2>&1 | tee /tmp/init.log
+          # Copy frontend dist to Android assets
+          if [ -d "../dist" ]; then
+            mkdir -p app/src/main/assets
+            cp -r ../dist/* app/src/main/assets/
+            echo "Copied dist to Android assets"
+            ls -la app/src/main/assets/
           fi
           npx tauri android build 2>&1 | tee /tmp/build.log
           echo "BUILD_EXIT=${PIPESTATUS[0]}" >> /tmp/build.env
