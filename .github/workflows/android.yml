@@ -51,18 +51,24 @@ jobs:
         with:
           workspaces: src-tauri
 
+      - name: Init Android project
+        run: |
+          cd src-tauri
+          if [ ! -d "gen/android" ]; then
+            npx tauri android init --ci 2>&1 | tee /tmp/init.log
+          fi
+          echo "gen/android exists: $(test -d gen/android && echo yes || echo no)"
+
       - name: Build Android APK
         run: |
           cd src-tauri
           echo "=== Building Rust library ==="
-          cargo build --target aarch64-linux-android --release 2>&1 | tail -5
+          cargo build --target aarch64-linux-android --release 2>&1 | tail -10
           echo "=== Rust artifacts ==="
           ls -la target/aarch64-linux-android/release/*.so 2>/dev/null || echo "No .so"
-          echo "=== Copying dist ==="
-          mkdir -p gen/android/app/src/main/assets/
-          cp -r ../dist/* gen/android/app/src/main/assets/ 2>/dev/null && echo "Copied dist" || echo "No dist"
           echo "=== Building APK ==="
-          npx tauri android build 2>&1 | tail -30
+          npx tauri android build 2>&1 | tee /tmp/build.log
+          echo "EXIT_CODE=$?" >> $GITHUB_ENV
 
       - name: Find APK
         id: find-apk
@@ -73,8 +79,11 @@ jobs:
           find . -name "*.apk" -type f 2>/dev/null
           echo "---"
           ls -la src-tauri/gen/android/app/build/outputs/apk/release/ 2>/dev/null || echo "No release APK dir"
+          ls -la src-tauri/gen/android/app/build/outputs/apk/universal/release/ 2>/dev/null || echo "No universal APK dir"
+          ls -la src-tauri/gen/android/app/build/outputs/ 2>/dev/null || echo "No outputs dir"
           APKS=$(find . -name "*.apk" -type f 2>/dev/null)
-          if [ -n "$APKS" ]; then echo "apk_found=true" >> $GITHUB_OUTPUT; else echo "apk_found=false" >> $GITHUB_OUTPUT; fi
+          if [ -n "$APKS" ]; then echo "apk_found=true" >> $GITHUB_OUTPUT; echo "APKS=$APKS"; else echo "apk_found=false" >> $GITHUB_OUTPUT; fi
+          echo "apk_found=$(if find src-tauri/gen/android -name '*.apk' -type f 2>/dev/null | grep -q .; then echo 'true'; else echo 'false'; fi)" >> $GITHUB_OUTPUT
 
       - name: Sign APK
         if: steps.find-apk.outputs.apk_found == 'true'
